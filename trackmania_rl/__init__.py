@@ -11,6 +11,7 @@ __all__ = [
     "policy",
     "rewards",
     "tmi_client",
+    "tmi_interaction",
     "track_pipeline",
 ]
 
