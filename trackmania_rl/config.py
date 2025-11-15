@@ -20,7 +20,9 @@ from dataclasses import dataclass
 class TMInterfaceCfg:
     """Settings that affect low-level connection to TMInterface."""
 
-    server_name: str = "TMInterface0"  # Windows named pipe / TCP server
+    host: str = "127.0.0.1"  # TCP host for the AngelScript plugin
+    port: int = 54540  # TCP port exposed by the plugin
+    server_name: str = "TMInterface0"  # kept for backward compatibility
     connect_timeout: float = 5.0  # seconds to wait until giving up
     game_speed: float = 1.0  # 1.0 – realtime, >1 faster, <1 slower
     prevent_finish: bool = True  # call iface.prevent_simulation_finish()

@@ -1,5 +1,4 @@
 numpy>=1.21.0
 torch>=2.0.0
 wandb>=0.15.0
-tminterface==1.4.5
 gymnasium>=0.29.0

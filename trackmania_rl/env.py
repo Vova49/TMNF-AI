@@ -91,7 +91,8 @@ class TrackmaniaEnv(gym.Env):
         from trackmania_rl.tmi_client import TMIConfig
 
         tmi_cfg = TMIConfig(
-            server_name=server_name or cfg.tmiface.server_name,
+            host=server_name or getattr(cfg.tmiface, "host", "127.0.0.1"),
+            port=getattr(cfg.tmiface, "port", 54540),
             game_speed=cfg.tmiface.game_speed,
             prevent_finish=cfg.tmiface.prevent_finish,
             connect_timeout_s=cfg.tmiface.connect_timeout,
