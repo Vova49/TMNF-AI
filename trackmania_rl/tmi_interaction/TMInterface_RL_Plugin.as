@@ -1,4 +1,4 @@
-// TMInterface ≥2.0 AngelScript plugin used by TMNF-AI.
+// TMInterface ≥2.0 AngelScript plugin used by TMNF-AI
 // Copy this file into TMInterface/Plugins and enable it in the Plugins menu.
 // Optional variables (set via TMInterface console or config):
 //   rl_bridge_port         - TCP port used for the socket server (default 54540)
