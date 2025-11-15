@@ -18,20 +18,12 @@ from dataclasses import dataclass
 # ---------------------------------------------------------------------------
 @dataclass
 class TMInterfaceCfg:
-    """Settings for the low-level bridge between Python and TMInterface.
+    """Settings that affect low-level connection to TMInterface."""
 
-    ``server_name`` historically pointed to a TMInterface named pipe.  When
-    using the AngelScript bridge it now refers to the host/IP address on which
-    the Python process listens for an incoming socket connection from the
-    plugin.  ``bridge_port`` specifies the TCP port used for that connection.
-    """
-
-    server_name: str = "127.0.0.1"  # Hostname/IP the AngelScript plugin connects to
-    bridge_port: int = 54545  # TCP port for the bridge socket
-    connect_timeout: float = 5.0  # Seconds to wait for the initial plugin connection
-    reconnect_interval: float = 1.0  # Seconds between reconnection attempts (if implemented)
+    server_name: str = "TMInterface0"  # Windows named pipe / TCP server
+    connect_timeout: float = 5.0  # seconds to wait until giving up
     game_speed: float = 1.0  # 1.0 – realtime, >1 faster, <1 slower
-    prevent_finish: bool = True  # Ask the plugin to call PreventSimulationFinish
+    prevent_finish: bool = True  # call iface.prevent_simulation_finish()
 
 
 @dataclass
@@ -73,4 +65,3 @@ TICKS_PER_STEP: int = env.ticks_per_step
 EPISODE_MAX_TICKS: int = env.episode_max_ticks
 FORWARD_SPEED_SCALE: float = reward.forward_speed_scale
 SERVER_NAME: str = tmiface.server_name
-BRIDGE_PORT: int = tmiface.bridge_port

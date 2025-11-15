@@ -49,7 +49,6 @@ class TrackmaniaEnv(gym.Env):
             ticks_per_step: int | None = None,
             episode_max_ticks: int | None = None,
             server_name: str | None = None,
-            bridge_port: int | None = None,
     ) -> None:
         super().__init__()
         self.ticks_per_step = ticks_per_step or cfg.TICKS_PER_STEP
@@ -93,15 +92,10 @@ class TrackmaniaEnv(gym.Env):
 
         tmi_cfg = TMIConfig(
             server_name=server_name or cfg.tmiface.server_name,
-            port=bridge_port or getattr(cfg.tmiface, "bridge_port", getattr(cfg.tmiface, "port", 54545)),
             game_speed=cfg.tmiface.game_speed,
             prevent_finish=cfg.tmiface.prevent_finish,
             connect_timeout_s=cfg.tmiface.connect_timeout,
         )
-        if hasattr(cfg.tmiface, "neutral_on_idle"):
-            tmi_cfg.neutral_on_idle = bool(getattr(cfg.tmiface, "neutral_on_idle"))
-        if hasattr(cfg.tmiface, "idle_ticks_threshold"):
-            tmi_cfg.idle_ticks_threshold = int(getattr(cfg.tmiface, "idle_ticks_threshold"))
         self.client = TMIClient(cfg=tmi_cfg)
 
         self._prev_state: Dict[str, float] | None = None
