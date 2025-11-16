@@ -219,21 +219,29 @@ class TrackmaniaEnv(gym.Env):
     # ------------------------------------------------------------------
     def _state_to_obs(self, state: Dict[str, float]):
         pos = state.get("position", (0.0, 0.0, 0.0))
-        yaw = float(state.get("yaw", 0.0))
+        yaw_raw = float(state.get("yaw", 0.0))  # как отдаёт TMInterface
         speed = float(state.get("speed", 0.0))
 
-        # вычисляем геометрию относительно центра
+        # Геометрия относительно центра
         s, d, tangent_angle, dist_cp = self.center.project_with_extras(pos)
-        ang_diff = self._angle_diff(yaw, tangent_angle)
 
-        # Сохраняем производные величины в state, чтобы их можно логировать/использовать далее
+        # Перевод yaw в ту же систему, что и tangent_angle (0 = вперёд по +X)
+        yaw_trigo = yaw_raw - np.pi / 2.0
+        # Нормируем при желании в [-pi, pi)
+        yaw_trigo = ((yaw_trigo + np.pi) % (2.0 * np.pi)) - np.pi
+
+        ang_diff = self._angle_diff(yaw_trigo, tangent_angle)
+
+        # Сохраняем всё в state для логов/награды
         state["s"] = float(s)
         state["d"] = float(d)
         state["tangent_angle"] = float(tangent_angle)
         state["dist_cp"] = float(dist_cp)
+        state["yaw_trigo"] = float(yaw_trigo)
         state["ang_diff"] = float(ang_diff)
 
-        return np.array([speed, yaw, s, d, ang_diff, dist_cp], dtype=np.float32)
+        # В наблюдение лучше отдавать уже "выправленный" yaw_trigo
+        return np.array([speed, yaw_trigo, s, d, ang_diff, dist_cp], dtype=np.float32)
 
     @staticmethod
     def _angle_diff(a: float, b: float) -> float:
