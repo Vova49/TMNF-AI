@@ -50,7 +50,7 @@ def _get(name: str, default: float) -> float:
 W_PROGRESS = _get("W_PROGRESS", 1.3)  # выравненный прогресс
 W_CP = _get("W_CP", 10.0)  # бонус за чекпоинт
 W_CP_SHAP = _get("W_CP_SHAP", 0.02)  # shaping по dist_cp
-W_WALL = _get("W_WALL", 2.0)  # штраф за касание стены
+W_WALL = _get("W_WALL", 6.0)  # штраф за касание стены
 W_IDLE = _get("W_IDLE", 0.002)  # штраф за простой
 W_BACKWARD = _get("W_BACKWARD", 2.0)  # штраф за явное движение назад
 W_SMOOTH_ANG = _get("W_SMOOTH_ANG", 0.03)  # мягкое наказание за |Δang_diff|

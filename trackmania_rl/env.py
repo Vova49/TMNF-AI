@@ -113,7 +113,7 @@ class TrackmaniaEnv(gym.Env):
         if not self.client.is_connected():
             self.client.start()
         else:
-            self.client.respawn()
+            self.client.respawn(to_start=True)  # всегда Delete
 
         # ждём первый тик от on_run_step, чтобы state был валидный
         if not self.client.wait_for_state(5):
