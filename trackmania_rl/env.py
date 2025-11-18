@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import warnings
 from typing import Dict, Tuple
-
+import math
 import gymnasium as gym  # type: ignore
 import numpy as np
 
@@ -105,6 +105,11 @@ class TrackmaniaEnv(gym.Env):
         # internal: track previous checkpoint index for finish detection
         self._prev_cp_index: int | None = None
 
+        # Для оценки heading по смещению в XZ
+        self._last_pos: Tuple[float, float, float] | None = None
+        self._last_heading: float = 0.0
+
+
     # ------------------------------------------------------------------
     # Gym API
     # ------------------------------------------------------------------
@@ -123,13 +128,20 @@ class TrackmaniaEnv(gym.Env):
         self._prev_state = self.client.get_state()
         self._current_state = self._prev_state
 
-        # включаем кулдаун
         # reset cp-index tracker
         try:
-            self._prev_cp_index = int(self._current_state.get('cp_index', 0)) if isinstance(self._current_state,
-                                                                                            dict) else None
+            self._prev_cp_index = int(self._current_state.get("cp_index", 0)) \
+                if isinstance(self._current_state, dict) else None
         except Exception:
             self._prev_cp_index = None
+
+        # сбрасываем историю позиции/направления
+        if isinstance(self._current_state, dict):
+            # если в стейте нет поля "position", возьмётся (0, 0, 0)
+            self._last_pos = self._current_state.get("position", (0.0, 0.0, 0.0))
+        else:
+            self._last_pos = None
+        self._last_heading = 0.0
 
         # нейтральных инпутов после респавна
         self._cooldown_left_ticks = int(self.respawn_cooldown_ticks)
@@ -137,7 +149,6 @@ class TrackmaniaEnv(gym.Env):
             # флаг полезен для reward, чтобы игнорить отрицат. ds из-за телепорта
             self._current_state["just_respawned"] = True
 
-        # print(f"[Env] reset: ticks=0, state received, respawn cooldown = {self._cooldown_left_ticks} ticks")
         obs = self._state_to_obs(self._current_state)
         return obs, {}
 
@@ -219,29 +230,38 @@ class TrackmaniaEnv(gym.Env):
     # ------------------------------------------------------------------
     def _state_to_obs(self, state: Dict[str, float]):
         pos = state.get("position", (0.0, 0.0, 0.0))
-        yaw_raw = float(state.get("yaw", 0.0))  # как отдаёт TMInterface
         speed = float(state.get("speed", 0.0))
 
-        # Геометрия относительно центра
+        # --- 1) Оценка heading по смещению в XZ ---
+        x, y, z = pos
+        heading = float(self._last_heading)
+
+        if self._last_pos is not None:
+            dx = x - self._last_pos[0]
+            dz = z - self._last_pos[2]
+            if dx * dx + dz * dz > 1e-6:
+                heading = math.atan2(dz, dx)
+
+        self._last_pos = (x, y, z)
+        self._last_heading = heading
+
+        # --- 2) Геометрия относительно центра ---
         s, d, tangent_angle, dist_cp = self.center.project_with_extras(pos)
+        ang_diff = self._angle_diff(heading, tangent_angle)
 
-        # Перевод yaw в ту же систему, что и tangent_angle (0 = вперёд по +X)
-        yaw_trigo = yaw_raw - np.pi / 2.0
-        # Нормируем при желании в [-pi, pi)
-        yaw_trigo = ((yaw_trigo + np.pi) % (2.0 * np.pi)) - np.pi
-
-        ang_diff = self._angle_diff(yaw_trigo, tangent_angle)
-
-        # Сохраняем всё в state для логов/награды
+        # --- 3) Сохраняем производные величины в state ---
         state["s"] = float(s)
         state["d"] = float(d)
         state["tangent_angle"] = float(tangent_angle)
         state["dist_cp"] = float(dist_cp)
-        state["yaw_trigo"] = float(yaw_trigo)
         state["ang_diff"] = float(ang_diff)
 
-        # В наблюдение лучше отдавать уже "выправленный" yaw_trigo
-        return np.array([speed, yaw_trigo, s, d, ang_diff, dist_cp], dtype=np.float32)
+        # полезно сохранить и сырые yaw из TMI, если захочешь отладить
+        state["heading"] = float(heading)
+        state["yaw_raw"] = float(state.get("yaw", 0.0))
+
+        # В obs вместо yaw теперь отдаём heading
+        return np.array([speed, heading, s, d, ang_diff, dist_cp], dtype=np.float32)
 
     @staticmethod
     def _angle_diff(a: float, b: float) -> float:
