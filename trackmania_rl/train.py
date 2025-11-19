@@ -363,7 +363,7 @@ def main():
     num_iterations = 1000  # Количество итераций
     steps_per_iteration = 2048  # Шагов за итерацию
     eval_freq = 10  # Частота оценки
-    save_freq = 5  # Частота сохранения
+    save_freq = 3  # Частота сохранения
 
     for iteration in range(num_iterations):
         print(f"Iteration {iteration}")

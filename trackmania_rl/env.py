@@ -277,6 +277,7 @@ class TrackmaniaEnv(gym.Env):
         # 2) If cfg.env.finish_cp_index exists — terminate when cp_index >= that value.
         # 3) If prevent_finish is False and cp_index wrapped around (decreased) without a respawn —
         #    assume we crossed finish.
+        # 4) Если машина упала ниже заданной высоты (Y < death_y_threshold) — считаем эпизод бесполезным и завершаем.
 
         # 1) explicit flag
         try:
@@ -316,6 +317,19 @@ class TrackmaniaEnv(gym.Env):
 
             # update tracker for next call
             self._prev_cp_index = cp_now
+
+        # 4) падение ниже минимальной высоты Y
+        try:
+            pos = state.get("position", None)
+            if pos is not None and len(pos) >= 2:
+                y = float(pos[1])
+                death_y = float(
+                    getattr(getattr(cfg, "env", object()), "death_y_threshold", 15.0)
+                )
+                if y < death_y:
+                    return True
+        except Exception:
+            pass
 
         return False
 

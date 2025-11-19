@@ -21,7 +21,6 @@
     curvature: float          # кривизна центра линии в текущей точке (1/м), |k| больше в крутых поворотах
     just_respawned: bool      # true если был ресет/телепорт в этот тик
 """
-
 from __future__ import annotations
 
 from math import cos, pi
@@ -36,7 +35,6 @@ try:
     _R = getattr(cfg, "reward", cfg)
 except Exception:
     cfg = None
-
 
     class _R:
         pass
@@ -54,6 +52,7 @@ W_WALL = _get("W_WALL", 6.0)  # штраф за касание стены
 W_IDLE = _get("W_IDLE", 0.002)  # штраф за простой
 W_BACKWARD = _get("W_BACKWARD", 2.0)  # штраф за явное движение назад
 W_SMOOTH_ANG = _get("W_SMOOTH_ANG", 0.03)  # мягкое наказание за |Δang_diff|
+W_FALL = _get("W_FALL", 80.0)  # крупный штраф за падение ниже трека (Y < death_y)
 
 # Параметры формы
 BACKWARD_THRESH = _get("BACKWARD_THRESH", 0.25)  # м за шаг, ниже считаем шумом
@@ -86,10 +85,12 @@ def _cp_index(state: Optional[Dict[str, Any]]) -> int:
         return 0
 
 
-def compute_reward(prev_state: Optional[Dict[str, Any]],
-                   cur_state: Optional[Dict[str, Any]],
-                   info: Optional[Dict[str, Any]] = None) -> float:
-    """Подсчёт награды за один RL‑шаг без штрафа за удаление от центра трассы."""
+def compute_reward(
+    prev_state: Optional[Dict[str, Any]],
+    cur_state: Optional[Dict[str, Any]],
+    info: Optional[Dict[str, Any]] = None,
+) -> float:
+    """Подсчёт награды за один RL-шаг без штрафа за удаление от центра трассы."""
     if prev_state is None or cur_state is None:
         return 0.0
 
@@ -98,7 +99,7 @@ def compute_reward(prev_state: Optional[Dict[str, Any]],
 
     # Респавн/телепорт — не считаем отрицательный ds
     just_respawned = _bool(cur_state, "just_respawned") or (
-            _safe(cur_state, "race_time", 0.0) < _safe(prev_state, "race_time", 0.0)
+        _safe(cur_state, "race_time", 0.0) < _safe(prev_state, "race_time", 0.0)
     )
     if just_respawned and ds < 0:
         ds = 0.0
@@ -127,7 +128,7 @@ def compute_reward(prev_state: Optional[Dict[str, Any]],
     r_cp = W_CP if took_cp else 0.0
 
     # 3) Shaping по приближению к CP, если dist_cp есть
-    dist_prev = _safe(prev_state, "dist_cp", float("nan"))
+    dist_prev = _safe(prev_state, "dist_cp", float("n an"))
     dist_cur = _safe(cur_state, "dist_cp", float("nan"))
     r_cp_shap = 0.0
     if dist_prev == dist_prev and dist_cur == dist_cur:
@@ -148,26 +149,60 @@ def compute_reward(prev_state: Optional[Dict[str, Any]],
     # 7) Сглаживание траектории: наказываем резкие изменения угла относительно тангенса
     r_smooth = -W_SMOOTH_ANG * dang / pi  # нормируем к [0,1]
 
-    total = r_progress + r_cp + r_cp_shap + r_wall + r_idle + r_backward + r_smooth
+    # 8) Крупный штраф за падение ниже минимальной высоты Y
+    r_fall = 0.0
+    try:
+        pos = cur_state.get("position")
+        if pos is not None and len(pos) >= 2:
+            y = float(pos[1])
+            death_y = 15.0
+            if cfg is not None:
+                try:
+                    death_y = float(
+                        getattr(getattr(cfg, "env", object()), "death_y_threshold", 15.0)
+                    )
+                except Exception:
+                    death_y = 15.0
+            if y < death_y:
+                r_fall = -W_FALL
+    except Exception:
+        r_fall = 0.0
+
+    total = (
+        r_progress
+        + r_cp
+        + r_cp_shap
+        + r_wall
+        + r_idle
+        + r_backward
+        + r_smooth
+        + r_fall
+    )
 
     if info is not None:
-        info.update({
-            "r_progress": r_progress,
-            "r_cp": r_cp,
-            "r_cp_shap": r_cp_shap,
-            "r_wall": r_wall,
-            "r_idle": r_idle,
-            "r_backward": r_backward,
-            "r_smooth": r_smooth,
-            "r_total": total,
-            "ds": ds,
-            "align": align,
-            "align_eff": align_eff,
-            "kappa": kappa,
-            "curv_div": curv_div,
-            "dang": dang,
-            "cp_prev": cp_prev,
-            "cp_cur": cp_cur,
-            "wall_contact": bool(cur_state.get("has_any_lateral_contact", False)),
-        })
+        info.update(
+            {
+                "r_progress": r_progress,
+                "r_cp": r_cp,
+                "r_cp_shap": r_cp_shap,
+                "r_wall": r_wall,
+                "r_idle": r_idle,
+                "r_backward": r_backward,
+                "r_smooth": r_smooth,
+                "r_fall": r_fall,
+                "fell_below_track": bool(r_fall < 0.0),
+                "r_total": total,
+                "ds": ds,
+                "align": align,
+                "align_eff": align_eff,
+                "kappa": kappa,
+                "curv_div": curv_div,
+                "dang": dang,
+                "cp_prev": cp_prev,
+                "cp_cur": cp_cur,
+                "wall_contact": bool(
+                    cur_state.get("has_any_lateral_contact", False)
+                ),
+            }
+        )
     return float(total)
