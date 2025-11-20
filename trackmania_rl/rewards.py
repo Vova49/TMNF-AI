@@ -1,3 +1,4 @@
+# rewards.py
 """Reward functions for TrackMania RL project (TMNF + TMInterface).
 
 Ключевые принципы под быстрейший проезд круга:
@@ -57,20 +58,6 @@ W_FALL = _get("W_FALL", 80.0)  # крупный штраф за падение �
 BACKWARD_THRESH = _get("BACKWARD_THRESH", 0.25)  # м за шаг, ниже считаем шумом
 ALIGN_GAMMA = _get("ALIGN_GAMMA", 1.0)  # степень для cos(ang) в прогрессе
 CURV_BETA = _get("CURV_BETA", 0.0)  # если >0, прогресс делится на (1+β|k|) — не наказывает за смещения на рейсинг-лайне
-
-
-# Новый штраф за "залипание" в стену при зажатом газе
-W_STUCK = _get("W_STUCK", 4.0)  # можно потом подкрутить
-
-# Пороговые параметры для детекции залипания
-STUCK_SPEED_MAX = _get("STUCK_SPEED_MAX", 4.0)          # м/с, считаем что почти стоим
-STUCK_MIN_PREV_SPEED = _get("STUCK_MIN_PREV_SPEED", 5.0)  # до этого ехали хотя бы столько
-STUCK_DS_MAX = _get("STUCK_DS_MAX", 0.10)               # прогресс по s почти нулевой
-STUCK_GAS_MIN = _get("STUCK_GAS_MIN", 0.5)              # газ нажимаем "по-настоящему"
-
-# Максимум для счётчика залипания — защищает от слишком больших отрицательных наград,
-# если агент долго торчит у стены. Можно переопределить через config.reward.MAX_STUCK_TICKS
-MAX_STUCK_TICKS = int(_get("MAX_STUCK_TICKS", 25))
 
 
 def _safe(state: Optional[Dict[str, Any]], key: str, default: float = 0.0) -> float:
@@ -141,58 +128,28 @@ def compute_reward(
     r_cp = W_CP if took_cp else 0.0
 
     # 3) Shaping по приближению к CP, если dist_cp есть
-    dist_prev = _safe(prev_state, "dist_cp", float("nan"))
+    dist_prev = _safe(prev_state, "dist_cp", float("n an"))
     dist_cur = _safe(cur_state, "dist_cp", float("nan"))
     r_cp_shap = 0.0
     if dist_prev == dist_prev and dist_cur == dist_cur:
         r_cp_shap = W_CP_SHAP * (dist_prev - dist_cur)
 
     # 4) Касание стены — штраф КАЖДЫЙ тик контакта
-    wall_lateral = bool(cur_state.get("has_any_lateral_contact", False))
-    r_wall = -W_WALL if wall_lateral else 0.0
+    contact_now = bool(cur_state.get("has_any_lateral_contact", False))
+    r_wall = -W_WALL if contact_now else 0.0
 
-    # 5) "Залипание" в стену/препятствие:
-    # жмём газ, но почти не двигаемся вперёд и скорость очень маленькая.
-    gas_cmd = _safe(cur_state, "cmd_gas", 0.0)
-    speed_prev = _safe(prev_state, "speed", 0.0)
-    speed_cur = _safe(cur_state, "speed", 0.0)
-    stuck_prev = int(_safe(prev_state, "stuck_ticks", 0.0))
-
-    base_blocked = (
-            gas_cmd > STUCK_GAS_MIN  # реально жмём газ
-            and not just_respawned  # не в момент респавна
-            and speed_cur < STUCK_SPEED_MAX  # почти стоим
-            and abs(ds) < STUCK_DS_MAX  # прогресс по s ≈ 0
-    )
-
-    # Запускаем "счётчик залипания" либо с момента сильного торможения,
-    # либо продолжаем его, если уже были в таком состоянии.
-    stuck_now = base_blocked and (
-            speed_prev > STUCK_MIN_PREV_SPEED or stuck_prev > 0
-    )
-    stuck_ticks = stuck_prev + 1 if stuck_now else 0
-
-    # Ограничиваем рост счётчика, чтобы штраф не рос бесконечно
-    stuck_ticks = min(stuck_ticks, MAX_STUCK_TICKS)
-
-    if isinstance(cur_state, dict):
-        # сохраняем счётчик в стейте, чтобы на следующем шаге его видеть как prev_state["stuck_ticks"]
-        cur_state["stuck_ticks"] = float(stuck_ticks)
-
-    r_stuck = -W_STUCK * float(stuck_ticks) if stuck_now else 0.0
-
-    # 6) Штраф за простой (мягкий базовый штраф)
+    # 5) Штраф за простой
     r_idle = -W_IDLE
 
-    # 7) Штраф за движение назад по s (не респавн)
+    # 6) Штраф за движение назад по s (не респавн)
     r_backward = 0.0
     if ds < -BACKWARD_THRESH and not just_respawned:
         r_backward = -W_BACKWARD * abs(ds)
 
-        # 8) Сглаживание траектории...
-    r_smooth = -W_SMOOTH_ANG * dang / pi
+    # 7) Сглаживание траектории: наказываем резкие изменения угла относительно тангенса
+    r_smooth = -W_SMOOTH_ANG * dang / pi  # нормируем к [0,1]
 
-    # 9) Крупный штраф за падение ниже минимальной высоты Y
+    # 8) Крупный штраф за падение ниже минимальной высоты Y
     r_fall = 0.0
     try:
         pos = cur_state.get("position")
@@ -216,7 +173,6 @@ def compute_reward(
         + r_cp
         + r_cp_shap
         + r_wall
-        + r_stuck
         + r_idle
         + r_backward
         + r_smooth
@@ -224,14 +180,12 @@ def compute_reward(
     )
 
     if info is not None:
-        wall_front_like = bool(stuck_now)
         info.update(
             {
                 "r_progress": r_progress,
                 "r_cp": r_cp,
                 "r_cp_shap": r_cp_shap,
                 "r_wall": r_wall,
-                "r_stuck": r_stuck,
                 "r_idle": r_idle,
                 "r_backward": r_backward,
                 "r_smooth": r_smooth,
@@ -246,11 +200,9 @@ def compute_reward(
                 "dang": dang,
                 "cp_prev": cp_prev,
                 "cp_cur": cp_cur,
-                "wall_contact": wall_lateral or wall_front_like,
-                "wall_lateral": wall_lateral,
-                "wall_front_like": wall_front_like,
-                "stuck_ticks": stuck_ticks,
-                "stuck_base_blocked": base_blocked,
+                "wall_contact": bool(
+                    cur_state.get("has_any_lateral_contact", False)
+                ),
             }
         )
     return float(total)

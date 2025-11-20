@@ -154,85 +154,68 @@ class TrackmaniaEnv(gym.Env):
 
     # env.py — внутри TrackmaniaEnv.step
     def step(self, action: np.ndarray):
-        """Один RL-шаг: (steer, gas, brake) -> наблюдение, награда и флаги done."""
         steer = float(action[0])
         gas = float(action[1])
         brake = bool(action[2] > 0.5)
 
         cooldown_active = self._cooldown_left_ticks > 0
-
-        # Команды, которые реально ушли в игру
-        steer_cmd = 0.0 if cooldown_active else steer
-        gas_cmd = 0.0 if cooldown_active else gas
-        brake_cmd = False if cooldown_active else brake
-
-        # Отправляем инпут один раз в начале RL-шага
-        self.client.send_inputs(steer=steer_cmd, gas=gas_cmd, brake=brake_cmd)
+        # 1) Зафиксировать инпут (или нейтраль во время кулдауна)
+        if cooldown_active:
+            self.client.send_inputs(steer=0.0, gas=0.0, brake=False)
+        else:
+            self.client.send_inputs(steer=steer, gas=gas, brake=brake)
 
         total_reward = 0.0
         last_obs = None
 
+        # 2) Дождаться и агрегировать ticks_per_step тиков физики
         ticks_to_wait = int(self.ticks_per_step)
         for _ in range(ticks_to_wait):
             # ждём следующий тик on_run_step
             if not self.client.wait_for_state(timeout=0.4):
-                # нет нового тика — используем последнее состояние
+                # нет нового тика — можно мягко продолжить или поднять warning
                 pass
 
+            # обновить состояния
             prev_state = self._current_state
             cur_state = self.client.get_state()
             self._prev_state = prev_state
             self._current_state = cur_state
 
-            if not isinstance(cur_state, dict):
-                # защитимся от неожиданностей
-                cur_state = {}
-                self._current_state = cur_state
-
-            # Помечаем телепорт/респавн во время кулдауна
-            if cooldown_active:
+            # помечаем телепорт/респаун во время кулдауна
+            if cooldown_active and isinstance(cur_state, dict):
                 cur_state["just_respawned"] = True
 
-            # Прокидываем реальные команды управления в state
-            cur_state["cmd_steer"] = float(steer_cmd)
-            cur_state["cmd_gas"] = float(gas_cmd)
-            cur_state["cmd_brake"] = bool(brake_cmd)
-
-            # СНАЧАЛА считаем геометрию относительно центра (s, d, ang_diff, dist_cp...)
-            obs_tick = self._state_to_obs(cur_state)
-
-            # ПОТОМ считаем награду — cur_state уже обогащён производными величинами
+            # покадровая награда
             r = (
                 rewards.compute_reward(prev_state, cur_state)
-                if prev_state is not None
-                else 0.0
+                if prev_state is not None else 0.0
             )
             total_reward += float(r)
 
-            last_obs = obs_tick
+            # наблюдение на основе последнего тика
+            last_obs = self._state_to_obs(cur_state)
 
             # уменьшаем кулдаун по тикам
-            if cooldown_active and self._cooldown_left_ticks > 0:
+            if cooldown_active:
                 self._cooldown_left_ticks = max(0, self._cooldown_left_ticks - 1)
 
         # учёт счётчика тиков и терминальности
         self._tick_counter += ticks_to_wait
-        cur_state = self._current_state if isinstance(self._current_state, dict) else {}
-
-        terminated = self._is_terminal(cur_state)
+        terminated = self._is_terminal(self._current_state)
         truncated = self._tick_counter >= self.episode_max_ticks
-
         info = {
-            "last_inputs": (steer_cmd, gas_cmd, brake_cmd),
+            "last_inputs": (steer, gas, brake),
             "cooldown_active": cooldown_active,
             "cooldown_left_ticks": max(0, self._cooldown_left_ticks),
-            "cp_index": int(cur_state.get("cp_index", -1)),
-            "race_time": float(cur_state.get("race_time", 0.0)),
+            "cp_index": int(self._current_state.get("cp_index", -1)) if isinstance(self._current_state, dict) else -1,
+            "race_time": float(self._current_state.get("race_time", 0.0)) if isinstance(self._current_state,
+                                                                                        dict) else 0.0,
         }
 
-        # запасной вариант, если по какой-то причине obs_tick не обновился
+        # запасной вариант, если не пришло новое состояние
         if last_obs is None:
-            last_obs = self._state_to_obs(cur_state)
+            last_obs = self._state_to_obs(self._current_state)
 
         return last_obs, total_reward, terminated, truncated, info
 
