@@ -362,7 +362,7 @@ def main():
     # Параметры обучения
     num_iterations = 1000  # Количество итераций
     steps_per_iteration = 2048  # Шагов за итерацию
-    eval_freq = 10  # Частота оценки
+    eval_freq = 6  # Частота оценки
     save_freq = 3  # Частота сохранения
 
     for iteration in range(num_iterations):

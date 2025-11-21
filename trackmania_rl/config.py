@@ -1,12 +1,12 @@
-"""Global configuration for the Trackmania RL project.
+"""Глобальная конфигурация проекта Trackmania RL.
 
-This module centralises all tunable hyper-parameters and runtime settings so
-that other components (environment, reward computation, client wrapper, etc.)
-can import them instead of hard-coding values.
+Этот модуль централизует все настраиваемые гиперпараметры и рабочие настройки,
+чтобы другие компоненты (окружение, расчёт награды, клиент TMInterface и т.п.)
+могли импортировать их, а не дублировать значения в коде.
 
-Feel free to tweak the numbers or even load them from ``.toml`` / ``.yaml`` in
-future – as long as you keep the public attribute names intact the rest of the
-code will continue to work.
+Числа можно свободно менять или в будущем загружать из ``.toml`` / ``.yaml`` —
+главное сохранять имена публичных атрибутов, тогда остальной код продолжит
+корректно работать.
 """
 from __future__ import annotations
 
@@ -14,54 +14,74 @@ from dataclasses import dataclass
 
 
 # ---------------------------------------------------------------------------
-# Dataclass groups – keep related parameters together for clarity
+# Группы dataclass — объединяем связанные параметры для наглядности
 # ---------------------------------------------------------------------------
 @dataclass
 class TMInterfaceCfg:
-    """Settings that affect low-level connection to TMInterface."""
+    """Настройки низкоуровневого подключения к TMInterface."""
 
-    host: str = "127.0.0.1"  # TCP host for the AngelScript plugin
-    port: int = 54540  # TCP port exposed by the plugin
-    server_name: str = "TMInterface0"  # kept for backward compatibility
-    connect_timeout: float = 5.0  # seconds to wait until giving up
-    game_speed: float = 1.0  # 1.0 – realtime, >1 faster, <1 slower
-    prevent_finish: bool = True  # call iface.prevent_simulation_finish()
+    host: str = "127.0.0.1"  # TCP-хост, на котором слушает плагин AngelScript
+    port: int = 54540  # TCP-порт, который открывает плагин
+    server_name: str = "TMInterface0"  # для обратной совместимости
+    connect_timeout: float = 5.0  # таймаут подключения (сек)
+    game_speed: float = 1.0  # 1.0 — реальное время; >1 быстрее; <1 медленнее
+    prevent_finish: bool = True  # вызывать iface.prevent_simulation_finish()
 
 
 @dataclass
 class EnvCfg:
-    """Gym-style environment parameters."""
+    """Параметры окружения в стиле Gymnasium."""
 
-    # How many *physics ticks* we aggregate into a single RL step
+    # Сколько *физических тиков* агрегируем в один RL-шаг
     ticks_per_step: int = 2
-    # Maximum number of physics ticks in a single episode (safety cut-off)
+    # Максимум тиков физики за эпизод (защитное ограничение)
     episode_max_ticks: int = 10_000
-    # Default path to the saved centre-line (can be overridden at runtime)
+    # Путь по умолчанию к сохранённой центральной линии (можно переопределить)
     centerline_path: str = "coords.txt"
 
-    respawn_cooldown_ticks: int = 20
+    respawn_cooldown_ticks: int = 20  # длительность кулдауна после респавна (в тиках)
 
 
 @dataclass
 class RewardCfg:
-    """Coefficients for shaping the reward signal."""
+    """Коэффициенты и параметры для формирования сигнала награды."""
 
-    # simple speed based shaping term (reward = scale * speed)
+    # Простой скоростной шейпинг (reward = scale * speed)
     forward_speed_scale: float = 1e-3
+
+    # Штраф за низкую скорость / простой
+    W_IDLE: float = 0.1
+    IDLE_SPEED_THRESH: float = 15.0
+
+    # Прогресс и чекпоинты
+    W_PROGRESS: float = 1.3       # вес основного прогресса по центру трассы (с выравниванием)
+    W_CP: float = 10.0            # бонус за взятие чекпоинта (разовый)
+    W_CP_SHAP: float = 0.02       # shaping за приближение к следующему CP (Δdist_cp)
+
+    # Штрафы
+    W_WALL: float = 4.0           # штраф за контакт со стеной (каждый тик контакта)
+    W_BACKWARD: float = 2.0       # штраф за явное движение назад по s (не респавн)
+    W_SMOOTH_ANG: float = 0.03    # мягкий штраф за резкие изменения угла относительно тангенса (сглаживание)
+    W_FALL: float = 20.0          # крупный штраф за падение ниже минимальной высоты трассы (Y < death_y)
+
+    # Параметры формы
+    BACKWARD_THRESH: float = 0.25  # порог «движения назад» по s (м/шаг)
+    ALIGN_GAMMA: float = 1.0       # степень в выравнивании по cos(угла)
+    CURV_BETA: float = 0.0         # делитель прогресса в зависимости от кривизны
 
 
 # ---------------------------------------------------------------------------
-# Instantiate *mutable* objects so the values can be patched at runtime
+# Экземпляры *изменяемых* конфигов — значения можно править во время работы
 # ---------------------------------------------------------------------------
 tmiface = TMInterfaceCfg()
 env = EnvCfg()
 reward = RewardCfg()
 
 # ---------------------------------------------------------------------------
-# Convenience top-level aliases (read-only!) – importers can do::
+# Удобные верхнеуровневые алиасы (только чтение!), чтобы писать короче, например:
 #     from trackmania_rl import config as cfg
 #     cfg.TICKS_PER_STEP
-# instead of deep attribute chains.
+# Вместо длинных цепочек атрибутов.
 # ---------------------------------------------------------------------------
 TICKS_PER_STEP: int = env.ticks_per_step
 EPISODE_MAX_TICKS: int = env.episode_max_ticks

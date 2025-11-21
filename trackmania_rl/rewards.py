@@ -26,38 +26,10 @@ from __future__ import annotations
 from math import cos, pi
 from typing import Dict, Any, Optional
 
-# ---------------------------------------------------------------------------
-# Конфиг (значения можно переопределить через config.reward.*)
-# ---------------------------------------------------------------------------
 try:
     from trackmania_rl import config as cfg
-
-    _R = getattr(cfg, "reward", cfg)
 except Exception:
     cfg = None
-
-    class _R:
-        pass
-
-
-def _get(name: str, default: float) -> float:
-    return float(getattr(_R, name, default))
-
-
-# Веса
-W_PROGRESS = _get("W_PROGRESS", 1.3)  # выравненный прогресс
-W_CP = _get("W_CP", 10.0)  # бонус за чекпоинт
-W_CP_SHAP = _get("W_CP_SHAP", 0.02)  # shaping по dist_cp
-W_WALL = _get("W_WALL", 4.0)  # штраф за касание стены
-W_IDLE = _get("W_IDLE", 0.01)  # штраф за простой
-W_BACKWARD = _get("W_BACKWARD", 2.0)  # штраф за явное движение назад
-W_SMOOTH_ANG = _get("W_SMOOTH_ANG", 0.03)  # мягкое наказание за |Δang_diff|
-W_FALL = _get("W_FALL", 20.0)  # крупный штраф за падение ниже трека (Y < death_y)
-
-# Параметры формы
-BACKWARD_THRESH = _get("BACKWARD_THRESH", 0.25)  # м за шаг, ниже считаем шумом
-ALIGN_GAMMA = _get("ALIGN_GAMMA", 1.0)  # степень для cos(ang) в прогрессе
-CURV_BETA = _get("CURV_BETA", 0.0)  # если >0, прогресс делится на (1+β|k|) — не наказывает за смещения на рейсинг-лайне
 
 
 def _safe(state: Optional[Dict[str, Any]], key: str, default: float = 0.0) -> float:
@@ -93,6 +65,20 @@ def compute_reward(
     """Подсчёт награды за один RL-шаг без штрафа за удаление от центра трассы."""
     if prev_state is None or cur_state is None:
         return 0.0
+
+    R = getattr(cfg, "reward", None) if cfg is not None else None
+    W_PROGRESS = float(getattr(R, "W_PROGRESS", 1.3))
+    W_CP = float(getattr(R, "W_CP", 10.0))
+    W_CP_SHAP = float(getattr(R, "W_CP_SHAP", 0.02))
+    W_WALL = float(getattr(R, "W_WALL", 4.0))
+    W_IDLE = float(getattr(R, "W_IDLE", 0.1))
+    W_BACKWARD = float(getattr(R, "W_BACKWARD", 2.0))
+    W_SMOOTH_ANG = float(getattr(R, "W_SMOOTH_ANG", 0.03))
+    W_FALL = float(getattr(R, "W_FALL", 20.0))
+    BACKWARD_THRESH = float(getattr(R, "BACKWARD_THRESH", 0.25))
+    ALIGN_GAMMA = float(getattr(R, "ALIGN_GAMMA", 1.0))
+    CURV_BETA = float(getattr(R, "CURV_BETA", 0.0))
+    IDLE_SPEED_THRESH = float(getattr(R, "IDLE_SPEED_THRESH", 15.0))
 
     s_prev, s_cur = _safe(prev_state, "s"), _safe(cur_state, "s")
     ds = s_cur - s_prev
@@ -139,7 +125,8 @@ def compute_reward(
     r_wall = -W_WALL if contact_now else 0.0
 
     # 5) Штраф за простой
-    r_idle = -W_IDLE
+    speed_cur = _safe(cur_state, "speed", 0.0)
+    r_idle = -W_IDLE if speed_cur < IDLE_SPEED_THRESH else 0.0
 
     # 6) Штраф за движение назад по s (не респавн)
     r_backward = 0.0
