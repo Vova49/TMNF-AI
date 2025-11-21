@@ -73,7 +73,6 @@ def compute_reward(
     W_WALL = float(getattr(R, "W_WALL", 4.0))
     W_IDLE = float(getattr(R, "W_IDLE", 0.1))
     W_BACKWARD = float(getattr(R, "W_BACKWARD", 2.0))
-    W_SMOOTH_ANG = float(getattr(R, "W_SMOOTH_ANG", 0.03))
     W_FALL = float(getattr(R, "W_FALL", 20.0))
     BACKWARD_THRESH = float(getattr(R, "BACKWARD_THRESH", 0.25))
     ALIGN_GAMMA = float(getattr(R, "ALIGN_GAMMA", 1.0))
@@ -90,8 +89,7 @@ def compute_reward(
     if just_respawned and ds < 0:
         ds = 0.0
 
-    ang_prev, ang_cur = _safe(prev_state, "ang_diff"), _safe(cur_state, "ang_diff")
-    dang = abs(ang_cur - ang_prev)
+    ang_cur = _safe(cur_state, "ang_diff")
 
     # 1) Выравненный прогресс: ds * max(0, cos(ang))^gamma
     # - если едем “поперёк/назад” по направлению (cos<0) — вклад 0
@@ -133,8 +131,7 @@ def compute_reward(
     if ds < -BACKWARD_THRESH and not just_respawned:
         r_backward = -W_BACKWARD * abs(ds)
 
-    # 7) Сглаживание траектории: наказываем резкие изменения угла относительно тангенса
-    r_smooth = -W_SMOOTH_ANG * dang / pi  # нормируем к [0,1]
+    # 7) Сглаживание по изменению угла удалено
 
     # 8) Крупный штраф за падение ниже минимальной высоты Y
     r_fall = 0.0
@@ -162,7 +159,6 @@ def compute_reward(
         + r_wall
         + r_idle
         + r_backward
-        + r_smooth
         + r_fall
     )
 
@@ -175,7 +171,6 @@ def compute_reward(
                 "r_wall": r_wall,
                 "r_idle": r_idle,
                 "r_backward": r_backward,
-                "r_smooth": r_smooth,
                 "r_fall": r_fall,
                 "fell_below_track": bool(r_fall < 0.0),
                 "r_total": total,
@@ -184,7 +179,6 @@ def compute_reward(
                 "align_eff": align_eff,
                 "kappa": kappa,
                 "curv_div": curv_div,
-                "dang": dang,
                 "cp_prev": cp_prev,
                 "cp_cur": cp_cur,
                 "wall_contact": bool(

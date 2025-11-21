@@ -134,7 +134,6 @@ def main() -> None:
             r_wall = float(info.get("r_wall", 0.0))
             r_idle = float(info.get("r_idle", 0.0))
             r_backward = float(info.get("r_backward", 0.0))
-            r_smooth = float(info.get("r_smooth", 0.0))
 
             idle_thresh = float(getattr(cfg.reward, "IDLE_SPEED_THRESH", 15.0))
             idle_w = float(getattr(cfg.reward, "W_IDLE", 0.1))
@@ -170,7 +169,6 @@ def main() -> None:
                 f"  • Штраф за низкую скорость (< {idle_thresh:.1f} м/с): {r_idle:.4f}"
                 f" — {'применён' if idle_active else 'не применяется'} (вес {idle_w:.3f})\n"
                 f"  • Штраф за движение назад по трассе: {r_backward:.4f}\n"
-                f"  • Штраф/бонус за плавность поворота (по изменению угла): {r_smooth:.4f}\n"
                 f"\n"
                 f"Накопленная награда за весь текущий заезд (эпизод): {ep_reward:.4f}\n"
             )
