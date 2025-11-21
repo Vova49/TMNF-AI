@@ -48,11 +48,11 @@ def _get(name: str, default: float) -> float:
 W_PROGRESS = _get("W_PROGRESS", 1.3)  # выравненный прогресс
 W_CP = _get("W_CP", 10.0)  # бонус за чекпоинт
 W_CP_SHAP = _get("W_CP_SHAP", 0.02)  # shaping по dist_cp
-W_WALL = _get("W_WALL", 6.0)  # штраф за касание стены
-W_IDLE = _get("W_IDLE", 0.002)  # штраф за простой
+W_WALL = _get("W_WALL", 4.0)  # штраф за касание стены
+W_IDLE = _get("W_IDLE", 0.01)  # штраф за простой
 W_BACKWARD = _get("W_BACKWARD", 2.0)  # штраф за явное движение назад
 W_SMOOTH_ANG = _get("W_SMOOTH_ANG", 0.03)  # мягкое наказание за |Δang_diff|
-W_FALL = _get("W_FALL", 80.0)  # крупный штраф за падение ниже трека (Y < death_y)
+W_FALL = _get("W_FALL", 20.0)  # крупный штраф за падение ниже трека (Y < death_y)
 
 # Параметры формы
 BACKWARD_THRESH = _get("BACKWARD_THRESH", 0.25)  # м за шаг, ниже считаем шумом
@@ -128,7 +128,7 @@ def compute_reward(
     r_cp = W_CP if took_cp else 0.0
 
     # 3) Shaping по приближению к CP, если dist_cp есть
-    dist_prev = _safe(prev_state, "dist_cp", float("n an"))
+    dist_prev = _safe(prev_state, "dist_cp", float("nan"))
     dist_cur = _safe(cur_state, "dist_cp", float("nan"))
     r_cp_shap = 0.0
     if dist_prev == dist_prev and dist_cur == dist_cur:
