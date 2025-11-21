@@ -136,6 +136,10 @@ def main() -> None:
             r_backward = float(info.get("r_backward", 0.0))
             r_smooth = float(info.get("r_smooth", 0.0))
 
+            idle_thresh = float(getattr(cfg.reward, "IDLE_SPEED_THRESH", 15.0))
+            idle_w = float(getattr(cfg.reward, "W_IDLE", 0.1))
+            idle_active = speed < idle_thresh
+
             text_wall = "ЕСТЬ контакт со стеной" if wall_contact else "НЕТ контакта со стеной"
 
             # Печатаем подробное пояснение по шагу
@@ -163,7 +167,8 @@ def main() -> None:
                 f"  • Награда за взятие чекпоинта: {r_cp:.4f}\n"
                 f"  • Награда за приближение к следующему чекпоинту (shaping по CP): {r_cp_shap:.4f}\n"
                 f"  • Штраф за касание стены: {r_wall:.4f}\n"
-                f"  • Постоянный маленький штраф за «простой» (идёт каждый шаг): {r_idle:.4f}\n"
+                f"  • Штраф за низкую скорость (< {idle_thresh:.1f} м/с): {r_idle:.4f}"
+                f" — {'применён' if idle_active else 'не применяется'} (вес {idle_w:.3f})\n"
                 f"  • Штраф за движение назад по трассе: {r_backward:.4f}\n"
                 f"  • Штраф/бонус за плавность поворота (по изменению угла): {r_smooth:.4f}\n"
                 f"\n"
