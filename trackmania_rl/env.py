@@ -12,9 +12,10 @@ Features:
 """
 from __future__ import annotations
 
+import math
 import warnings
 from typing import Dict, Tuple
-import math
+
 import gymnasium as gym  # type: ignore
 import numpy as np
 
@@ -65,8 +66,8 @@ class TrackmaniaEnv(gym.Env):
         path = centerline_path or cfg.env.centerline_path
         self.center = track.CenterLine(path) if callable(getattr(track, "CenterLine", None)) else MinimalCenterLine()
 
-        # Observation: [speed, yaw, s, d, ang_diff, dist_cp]
-        low = np.array([0.0, -np.pi, 0.0, -50.0, -np.pi, 0.0], dtype=np.float32)
+        # Observation: [speed, yaw, s, d, ang_diff, dist_cp, wall_contact]
+        low = np.array([0.0, -np.pi, 0.0, -50.0, -np.pi, 0.0, 0.0], dtype=np.float32)
         high = np.array(
             [
                 400.0,
@@ -75,6 +76,7 @@ class TrackmaniaEnv(gym.Env):
                 50.0,
                 np.pi,
                 200.0,
+                1.0,
             ],
             dtype=np.float32,
         )
@@ -108,7 +110,6 @@ class TrackmaniaEnv(gym.Env):
         # Для оценки heading по смещению в XZ
         self._last_pos: Tuple[float, float, float] | None = None
         self._last_heading: float = 0.0
-
 
     # ------------------------------------------------------------------
     # Gym API
@@ -261,7 +262,8 @@ class TrackmaniaEnv(gym.Env):
         state["yaw_raw"] = float(state.get("yaw", 0.0))
 
         # В obs вместо yaw теперь отдаём heading
-        return np.array([speed, heading, s, d, ang_diff, dist_cp], dtype=np.float32)
+        wall_contact = 1.0 if bool(state.get("has_any_lateral_contact", False)) else 0.0
+        return np.array([speed, heading, s, d, ang_diff, dist_cp, wall_contact], dtype=np.float32)
 
     @staticmethod
     def _angle_diff(a: float, b: float) -> float:

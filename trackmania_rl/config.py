@@ -45,16 +45,12 @@ class EnvCfg:
 @dataclass
 class RewardCfg:
     """Коэффициенты и параметры для формирования сигнала награды."""
-
-    # Простой скоростной шейпинг (reward = scale * speed)
-    forward_speed_scale: float = 1e-3
-
     # Штраф за низкую скорость / простой
     W_IDLE: float = 0.1
     IDLE_SPEED_THRESH: float = 10.0
 
     # Прогресс и чекпоинты
-    W_PROGRESS: float = 1.3       # вес основного прогресса по центру трассы (с выравниванием)
+    W_PROGRESS: float = 1.4       # вес основного прогресса по центру трассы (с выравниванием)
     W_CP: float = 10.0            # бонус за взятие чекпоинта (разовый)
     W_CP_SHAP: float = 0.02       # shaping за приближение к следующему CP (Δdist_cp)
 
@@ -65,7 +61,7 @@ class RewardCfg:
 
     # Параметры формы
     BACKWARD_THRESH: float = 0.25  # порог «движения назад» по s (м/шаг)
-    ALIGN_GAMMA: float = 1.0       # степень в выравнивании по cos(угла)
+    ALIGN_GAMMA: float = 0.6       # степень в выравнивании по cos(угла)
     CURV_BETA: float = 0.0         # делитель прогресса в зависимости от кривизны
 
 
@@ -84,5 +80,4 @@ reward = RewardCfg()
 # ---------------------------------------------------------------------------
 TICKS_PER_STEP: int = env.ticks_per_step
 EPISODE_MAX_TICKS: int = env.episode_max_ticks
-FORWARD_SPEED_SCALE: float = reward.forward_speed_scale
 SERVER_NAME: str = tmiface.server_name

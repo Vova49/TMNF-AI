@@ -243,13 +243,11 @@ class PPOTrainer:
                 normal_dist, brake_probs = self.policy(b_obs)
                 values = self.value_net(b_obs).squeeze()
 
-                # Continuous actions (steer, throttle)
-                # b_actions contains throttle in [0,1]; convert back to [-1,1] for log-prob under Normal
                 steer = b_actions[:, 0]
                 throttle01 = b_actions[:, 1]
                 throttle = torch.clamp(throttle01 * 2.0 - 1.0, -1.0, 1.0)
                 continuous_actions_pre = torch.stack([steer, throttle], dim=-1)
-                log_probs = normal_dist.log_prob(continuous_actions_pre).sum(-1)
+                log_probs = self.policy.log_prob_squashed(normal_dist, continuous_actions_pre)
 
                 # Binary action (brake) – текущие и старые log_probs
                 brake_actions = b_actions[:, 2]

@@ -71,27 +71,18 @@ class Policy(nn.Module):
                 - Дополнительная информация для обучения
         """
         normal_dist, brake_probs = self.forward(obs)
-
-        # Семплируем steer и throttle
-        continuous_actions = normal_dist.sample()
-        continuous_actions = torch.tanh(continuous_actions)  # В диапазон [-1, 1]
-
-        # Семплируем binary brake
+        z = normal_dist.rsample()
+        a = torch.tanh(z)
         brake = torch.bernoulli(brake_probs)
-
-        # Преобразуем компоненты: steer остаётся в [-1,1], throttle -> [0,1]
-        steer = continuous_actions[:, 0].unsqueeze(-1)
-        throttle = continuous_actions[:, 1]
-        throttle01 = torch.clamp(0.5 * (throttle + 1.0), 0.0, 1.0).unsqueeze(-1)
-
-        # Собираем полное действие (steer [-1,1], throttle [0,1], brake {0,1})
+        steer = a[:, 0].unsqueeze(-1)
+        throttle01 = torch.clamp(0.5 * (a[:, 1] + 1.0), 0.0, 1.0).unsqueeze(-1)
         action = torch.cat([steer, throttle01, brake], dim=-1)
-
+        log_det = torch.log(1.0 - a.pow(2) + 1e-6).sum(-1)
+        base_log_prob = normal_dist.log_prob(z).sum(-1)
         info = {
-            'log_prob': normal_dist.log_prob(continuous_actions).sum(-1),
+            'log_prob': base_log_prob - log_det,
             'brake_prob': brake_probs
         }
-
         return action, info
 
     @staticmethod
@@ -114,3 +105,9 @@ class Policy(nn.Module):
         handbrake = False  # Пока не используем
 
         return steer, throttle, brake, handbrake
+
+    def log_prob_squashed(self, normal_dist: Normal, squashed_actions: torch.Tensor) -> torch.Tensor:
+        z = torch.atanh(torch.clamp(squashed_actions, -0.999999, 0.999999))
+        base = normal_dist.log_prob(z).sum(-1)
+        log_det = torch.log(1.0 - squashed_actions.pow(2) + 1e-6).sum(-1)
+        return base - log_det
