@@ -18,8 +18,8 @@ import math
 from typing import Dict, Any
 
 from trackmania_rl import rewards, config as cfg
-from trackmania_rl.track_pipeline import CenterLine
 from trackmania_rl.tmi_client import TMIClient, TMIConfig
+from trackmania_rl.track_pipeline import CenterLine
 
 
 def _angle_diff(a: float, b: float) -> float:
@@ -50,7 +50,6 @@ def augment_state(raw_state: Dict[str, Any], center: CenterLine, heading: float 
         state["heading"] = float(heading)
 
     return state
-
 
 
 def main() -> None:
@@ -125,7 +124,7 @@ def main() -> None:
             ang_diff_rad = float(cur_state.get("ang_diff", 0.0))
             ang_diff_deg = ang_diff_rad * 180.0 / math.pi
 
-            align = float(info.get("align", 0.0))         # cos угла
+            align = float(info.get("align", 0.0))  # cos угла
             align_eff = float(info.get("align_eff", 0.0))  # cos^gamma после обрезки
 
             r_progress = float(info.get("r_progress", 0.0))

@@ -18,9 +18,9 @@ import os
 import time
 
 import torch
+
 from trackmania_rl.env import TrackmaniaEnv
 from trackmania_rl.policy import Policy
-
 
 CHECKPOINT_PATH = "checkpoints/last.pt"
 

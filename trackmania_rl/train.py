@@ -182,7 +182,6 @@ class PPOTrainer:
                 self._bootstrap_value = 0.0
                 self._bootstrap_done = 1.0
 
-
     def compute_advantages(self):
         """Вычисление advantage function и returns."""
         obs = torch.FloatTensor(self.buffer.obs).to(self.device)
@@ -214,7 +213,6 @@ class PPOTrainer:
         advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
 
         return advantages.cpu().numpy(), returns.cpu().numpy()
-
 
     def update(self):
         """Обновление политики и value function."""

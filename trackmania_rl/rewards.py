@@ -23,7 +23,7 @@
 """
 from __future__ import annotations
 
-from math import cos, pi
+from math import cos
 from typing import Dict, Any, Optional
 
 try:
@@ -58,9 +58,9 @@ def _cp_index(state: Optional[Dict[str, Any]]) -> int:
 
 
 def compute_reward(
-    prev_state: Optional[Dict[str, Any]],
-    cur_state: Optional[Dict[str, Any]],
-    info: Optional[Dict[str, Any]] = None,
+        prev_state: Optional[Dict[str, Any]],
+        cur_state: Optional[Dict[str, Any]],
+        info: Optional[Dict[str, Any]] = None,
 ) -> float:
     """Подсчёт награды за один RL-шаг без штрафа за удаление от центра трассы."""
     if prev_state is None or cur_state is None:
@@ -84,7 +84,7 @@ def compute_reward(
 
     # Респавн/телепорт — не считаем отрицательный ds
     just_respawned = _bool(cur_state, "just_respawned") or (
-        _safe(cur_state, "race_time", 0.0) < _safe(prev_state, "race_time", 0.0)
+            _safe(cur_state, "race_time", 0.0) < _safe(prev_state, "race_time", 0.0)
     )
     if just_respawned and ds < 0:
         ds = 0.0
@@ -153,13 +153,13 @@ def compute_reward(
         r_fall = 0.0
 
     total = (
-        r_progress
-        + r_cp
-        + r_cp_shap
-        + r_wall
-        + r_idle
-        + r_backward
-        + r_fall
+            r_progress
+            + r_cp
+            + r_cp_shap
+            + r_wall
+            + r_idle
+            + r_backward
+            + r_fall
     )
 
     if info is not None:

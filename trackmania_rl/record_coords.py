@@ -1,4 +1,3 @@
-import time
 from trackmania_rl.tmi_client import TMIClient, TMIConfig
 
 OUTPUT_PATH = "coords.txt"  # сюда запишутся координаты
